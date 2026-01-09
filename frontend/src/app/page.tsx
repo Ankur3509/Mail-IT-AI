@@ -35,7 +35,7 @@ export default function MailAiApp() {
     setIsGenerating(true);
     setDraft(null);
     try {
-      const response = await fetch("http://localhost:8000/generate-draft", {
+      const response = await fetch("https://mail-it-ai.onrender.com/generate-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -72,7 +72,7 @@ export default function MailAiApp() {
 
     setIsSending(true);
     try {
-      const response = await fetch("http://localhost:8000/send-email", {
+      const response = await fetch("https://mail-it-ai.onrender.com/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -105,7 +105,7 @@ export default function MailAiApp() {
 
     setIsSending(true);
     try {
-      const response = await fetch("http://localhost:8000/create-draft-gmail", {
+      const response = await fetch("https://mail-it-ai.onrender.com/create-draft-gmail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
