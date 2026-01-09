@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { Send, Wand2, Trash2, CheckCircle, Mail, User, PenTool, MessageSquare, Loader2, ArchiveRestore, LogIn } from "lucide-react";
 
@@ -423,7 +424,11 @@ export default function MailAiApp() {
       </div>
 
       {/* Footer */}
-      <footer className="mt-20 text-center text-gray-400 text-sm">
+      <footer className="mt-20 text-center text-gray-400 text-sm space-y-4">
+        <div className="flex justify-center gap-6">
+          <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+          <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
+        </div>
         <p>© 2026 Mail IT AI. Developed with ❤️ for professional communication.</p>
       </footer>
     </div>
