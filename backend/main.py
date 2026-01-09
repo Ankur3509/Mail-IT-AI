@@ -81,7 +81,18 @@ async def generate_draft(request: DraftRequest):
         )
         
         text = chat_completion.choices[0].message.content.strip()
+        # Handle cases where AI might wrap the JSON in markdown code blocks despite instructions
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        
         draft_data = json.loads(text)
+        
+        # Robustness check: if AI returns a list containing the object
+        if isinstance(draft_data, list) and len(draft_data) > 0:
+            draft_data = draft_data[0]
+            
         return EmailDraft(**draft_data)
     except Exception as e:
         print(f"Error generating draft: {e}")
