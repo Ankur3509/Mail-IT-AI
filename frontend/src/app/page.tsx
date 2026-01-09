@@ -35,14 +35,22 @@ export default function MailAiApp() {
   }, []);
 
   const connectGmail = async () => {
+    console.log("Connect Gmail clicked...");
     try {
       const response = await fetch("https://mail-it-ai.onrender.com/auth-url");
+      console.log("Response status:", response.status);
       const data = await response.json();
+      console.log("Auth URL data:", data);
       if (data.url) {
         window.location.href = data.url;
+      } else {
+        console.error("No URL returned from backend:", data);
+        alert("Server did not return an auth URL. Check backend logs.");
       }
     } catch (error) {
+      console.error("Connection error:", error);
       showNotification("error", "Failed to start Gmail connection.");
+      alert("Error: " + (error instanceof Error ? error.message : "Network error"));
     }
   };
 
