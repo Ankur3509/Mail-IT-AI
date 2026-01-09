@@ -26,7 +26,7 @@ export default function PrivacyPolicy() {
                         <section>
                             <h2 className="text-xl font-bold text-gray-800 mb-2">1. Introduction</h2>
                             <p>
-                                Welcome to Mail IT AI. We are committed to protecting your personal information and your right to privacy.
+                                Welcome to Mailit AI. We are committed to protecting your personal information and your right to privacy.
                                 This Privacy Policy explains how we handle your data when you use our service, particularly your Gmail data.
                             </p>
                         </section>
@@ -46,7 +46,7 @@ export default function PrivacyPolicy() {
                         <section>
                             <h2 className="text-xl font-bold text-gray-800 mb-2">3. How We Use Your Data</h2>
                             <p>
-                                <b>Mail IT AI does not store your emails, contacts, or personal data on our servers.</b>
+                                <b>Mailit AI does not store your emails, contacts, or personal data on our servers.</b>
                                 We use the Google OAuth tokens solely to perform the actions you explicitly request (like "Send" or "Save Draft").
                                 Your authentication tokens are stored locally in your browser and are sent to our backend only during active requests.
                             </p>

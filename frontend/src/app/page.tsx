@@ -209,7 +209,7 @@ export default function MailAiApp() {
             </div>
           )}
           <h1 className="text-4xl font-extrabold text-gray-900 sm:text-5xl tracking-tight mb-4">
-            Mail <span className="text-primary italic">IT</span> AI
+            Mailit <span className="text-primary italic">AI</span>
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             The professional AI email assistant. Prompt, preview, and send in seconds.
@@ -429,7 +429,7 @@ export default function MailAiApp() {
           <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
           <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
         </div>
-        <p>© 2026 Mail IT AI. Developed with ❤️ for professional communication.</p>
+        <p>© 2026 Mailit AI. Developed with ❤️ for professional communication.</p>
       </footer>
     </div>
   );

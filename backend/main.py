@@ -35,7 +35,7 @@ SCOPES = [
 # Initialize Groq
 client = Groq(api_key=GROQ_API_KEY)
 
-app = FastAPI(title="Mail IT AI API")
+app = FastAPI(title="Mailit AI API")
 
 app.add_middleware(
     CORSMiddleware,

@@ -26,7 +26,7 @@ export default function TermsOfService() {
                         <section>
                             <h2 className="text-xl font-bold text-gray-800 mb-2">1. Acceptance of Terms</h2>
                             <p>
-                                By accessing and using Mail IT AI, you agree to be bound by these Terms of Service.
+                                By accessing and using Mailit AI, you agree to be bound by these Terms of Service.
                                 If you do not agree, please do not use the service.
                             </p>
                         </section>
@@ -34,7 +34,7 @@ export default function TermsOfService() {
                         <section>
                             <h2 className="text-xl font-bold text-gray-800 mb-2">2. Description of Service</h2>
                             <p>
-                                Mail IT AI is an AI-powered tool that assists users in drafting and sending emails via their own Gmail accounts
+                                Mailit AI is an AI-powered tool that assists users in drafting and sending emails via their own Gmail accounts
                                 using Google OAuth2 integration and Groq AI models.
                             </p>
                         </section>
@@ -42,7 +42,7 @@ export default function TermsOfService() {
                         <section>
                             <h2 className="text-xl font-bold text-gray-800 mb-2">3. User Responsibility</h2>
                             <p>
-                                You are responsible for all content sent through the service. You agree not to use Mail IT AI for:
+                                You are responsible for all content sent through the service. You agree not to use Mailit AI for:
                             </p>
                             <ul className="list-disc pl-5 mt-2 space-y-1">
                                 <li>Sending spam or unsolicited bulk emails.</li>
@@ -54,7 +54,7 @@ export default function TermsOfService() {
                         <section>
                             <h2 className="text-xl font-bold text-gray-800 mb-2">4. Intelletual Property</h2>
                             <p>
-                                The code for Mail IT AI is provided as-is. The generated email drafts are yours to use,
+                                The code for Mailit AI is provided as-is. The generated email drafts are yours to use,
                                 but we do not guarantee the accuracy or correctness of the AI-generated content.
                             </p>
                         </section>
@@ -62,7 +62,7 @@ export default function TermsOfService() {
                         <section>
                             <h2 className="text-xl font-bold text-gray-800 mb-2">5. Limitation of Liability</h2>
                             <p>
-                                Mail IT AI is provided "as is" without any warranties. We are not liable for any damages
+                                Mailit AI is provided "as is" without any warranties. We are not liable for any damages
                                 arising from the use or inability to use this service, including errors in email delivery
                                 or AI-generated content.
                             </p>

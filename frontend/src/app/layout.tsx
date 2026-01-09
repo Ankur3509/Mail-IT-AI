@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mail IT AI",
-  description: "Mail IT AI - A professional AI-powered email drafting and sending assistant.",
+  title: "Mailit AI",
+  description: "Mailit AI - A professional AI-powered email drafting and sending assistant.",
 };
 
 export default function RootLayout({
