@@ -3,11 +3,12 @@
 A professional AI-powered email drafting and sending assistant.
 
 ## Features
-- AI-driven draft generation (using Google Gemini)
+- AI-driven draft generation (using Groq Llama 3.1)
+- Custom Editing: Fine-tune drafts before sending
+- One-click Gmail Drafts: Save directly to your Gmail account
 - Modern, professional UI with glassmorphism
 - Real-time preview of drafted emails
 - Secure SMTP integration for sending
-- Confirmation-first workflow (no accidental sends)
 
 ## Setup
 
@@ -26,5 +27,5 @@ A professional AI-powered email drafting and sending assistant.
 4. Open [http://localhost:3000](http://localhost:3000)
 
 ## API Keys Required
-- **Google Gemini API Key**: Get it for free at [Google AI Studio](https://aistudio.google.com/)
-- **SMTP Credentials**: Use a Gmail App Password or any SMTP service (Mailtrap, SendGrid, etc.)
+- **Groq API Key**: Get it at [Groq Console](https://console.groq.com/)
+- **SMTP/IMAP Credentials**: Use a Gmail App Password
