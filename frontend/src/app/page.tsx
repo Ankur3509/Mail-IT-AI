@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { Send, Wand2, Trash2, CheckCircle, Mail, User, PenTool, MessageSquare, Loader2, ArchiveRestore } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Send, Wand2, Trash2, CheckCircle, Mail, User, PenTool, MessageSquare, Loader2, ArchiveRestore, LogIn } from "lucide-react";
 
 interface Draft {
   subject: string;
@@ -20,7 +20,31 @@ export default function MailAiApp() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  useEffect(() => {
+    // Check for token in URL after OAuth redirect
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    if (token) {
+      setAuthToken(token);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      showNotification("success", "Gmail connected successfully!");
+    }
+  }, []);
+
+  const connectGmail = async () => {
+    try {
+      const response = await fetch("https://mail-it-ai.onrender.com/auth-url");
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      showNotification("error", "Failed to start Gmail connection.");
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -70,6 +94,11 @@ export default function MailAiApp() {
       return;
     }
 
+    if (!authToken) {
+      showNotification("error", "Please connect your Gmail first.");
+      return;
+    }
+
     setIsSending(true);
     try {
       const response = await fetch("https://mail-it-ai.onrender.com/send-email", {
@@ -79,6 +108,7 @@ export default function MailAiApp() {
           recipient_email: formData.recipient_email,
           subject: draft.subject,
           body: draft.body,
+          auth_token: authToken,
         }),
       });
 
@@ -103,6 +133,11 @@ export default function MailAiApp() {
       return;
     }
 
+    if (!authToken) {
+      showNotification("error", "Please connect your Gmail first.");
+      return;
+    }
+
     setIsSending(true);
     try {
       const response = await fetch("https://mail-it-ai.onrender.com/create-draft-gmail", {
@@ -112,6 +147,7 @@ export default function MailAiApp() {
           recipient_email: formData.recipient_email,
           subject: draft.subject,
           body: draft.body,
+          auth_token: authToken,
         }),
       });
 
@@ -149,6 +185,20 @@ export default function MailAiApp() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
+          {!authToken ? (
+            <button
+              onClick={connectGmail}
+              className="mb-8 inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-700 font-bold rounded-full shadow-md border border-gray-100 hover:bg-gray-50 hover:shadow-lg transition-all"
+            >
+              <LogIn className="w-5 h-5 text-google-red" style={{ color: '#DB4437' }} />
+              Connect your Gmail account
+            </button>
+          ) : (
+            <div className="mb-8 inline-flex items-center gap-2 px-6 py-2 bg-emerald-50 text-emerald-700 font-medium rounded-full border border-emerald-100">
+              <CheckCircle className="w-4 h-4" />
+              Gmail Connected
+            </div>
+          )}
           <h1 className="text-4xl font-extrabold text-gray-900 sm:text-5xl tracking-tight mb-4">
             Mail <span className="text-primary italic">IT</span> AI
           </h1>

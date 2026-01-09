@@ -1,23 +1,36 @@
 import os
 import json
 import smtplib
+import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from groq import Groq
 
+# Google Auth imports
+from google_auth_oauthlib.flow import Flow
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from google.auth.transport.requests import Request as GoogleRequest
+
 load_dotenv()
 
 # Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-IMAP_SERVER = "imap.gmail.com" # For drafting
-SMTP_USERNAME = os.getenv("SMTP_USERNAME")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://mail-it-ai.onrender.com/oauth2callback")
+
+# Scopes for Gmail
+SCOPES = [
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/gmail.compose',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'openid'
+]
 
 # Initialize Groq
 client = Groq(api_key=GROQ_API_KEY)
@@ -46,6 +59,7 @@ class SendRequest(BaseModel):
     recipient_email: str
     subject: str
     body: str
+    auth_token: str # Token from OAuth
 
 @app.post("/generate-draft", response_model=EmailDraft)
 async def generate_draft(request: DraftRequest):
@@ -81,15 +95,12 @@ async def generate_draft(request: DraftRequest):
         )
         
         text = chat_completion.choices[0].message.content.strip()
-        # Handle cases where AI might wrap the JSON in markdown code blocks despite instructions
         if text.startswith("```"):
             text = text.split("```")[1]
             if text.startswith("json"):
                 text = text[4:]
         
         draft_data = json.loads(text)
-        
-        # Robustness check: if AI returns a list containing the object
         if isinstance(draft_data, list) and len(draft_data) > 0:
             draft_data = draft_data[0]
             
@@ -98,60 +109,115 @@ async def generate_draft(request: DraftRequest):
         print(f"Error generating draft: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate draft: {str(e)}")
 
+# --- OAuth2 Endpoints ---
+
+@app.get("/auth-url")
+async def get_auth_url():
+    if not CLIENT_ID or not CLIENT_SECRET:
+        raise HTTPException(status_code=500, detail="Google Client credentials not configured")
+        
+    client_config = {
+        "web": {
+            "client_id": CLIENT_ID,
+            "project_id": "mail-it-ai",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_secret": CLIENT_SECRET,
+            "redirect_uris": [REDIRECT_URI]
+        }
+    }
+    
+    flow = Flow.from_client_config(client_config, scopes=SCOPES)
+    flow.redirect_uri = REDIRECT_URI
+    
+    auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
+    return {"url": auth_url}
+
+@app.get("/oauth2callback")
+async def oauth2callback(code: str):
+    client_config = {
+        "web": {
+            "client_id": CLIENT_ID,
+            "project_id": "mail-it-ai",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_secret": CLIENT_SECRET,
+            "redirect_uris": [REDIRECT_URI]
+        }
+    }
+    
+    flow = Flow.from_client_config(client_config, scopes=SCOPES)
+    flow.redirect_uri = REDIRECT_URI
+    flow.fetch_token(code=code)
+    
+    creds = flow.credentials
+    # In a real app, we'd store this in a DB. 
+    # For now, we'll redirect back to frontend with the token in the URL (simplified)
+    frontend_url = os.getenv("FRONTEND_URL", "https://mailitai.netlify.app")
+    token_json = creds.to_json()
+    encoded_token = base64.b64encode(token_json.encode()).decode()
+    
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(f"{frontend_url}/?token={encoded_token}")
+
 @app.post("/send-email")
 async def send_email(request: SendRequest):
-    if not SMTP_USERNAME or not SMTP_PASSWORD:
-        raise HTTPException(status_code=500, detail="SMTP credentials (email/app password) not configured in .env")
-
     try:
-        msg = MIMEMultipart()
-        msg['From'] = SMTP_USERNAME
-        msg['To'] = request.recipient_email
-        msg['Subject'] = request.subject
-        msg.attach(MIMEText(request.body, 'plain'))
+        # Reconstruct credentials
+        token_data = base64.b64decode(request.auth_token).decode()
+        creds_info = json.loads(token_data)
+        creds = Credentials.from_authorized_user_info(creds_info, SCOPES)
+        
+        if creds.expired and creds.refresh_token:
+            creds.refresh(GoogleRequest())
 
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.send_message(msg)
-            
-        return {"status": "success", "message": "Email sent successfully"}
+        service = build('gmail', 'v1', credentials=creds)
+        
+        message = MIMEMultipart()
+        message['to'] = request.recipient_email
+        message['subject'] = request.subject
+        message.attach(MIMEText(request.body, 'plain'))
+        
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        create_message = {'raw': raw_message}
+        
+        service.users().messages().send(userId="me", body=create_message).execute()
+        return {"status": "success", "message": "Email sent successfully via your Gmail!"}
     except Exception as e:
         print(f"Error sending email: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/create-draft-gmail")
 async def create_draft_gmail(request: SendRequest):
-    """Creates a draft directly in the Gmail Drafts folder using IMAP."""
-    import imaplib
-    import time
-
-    if not SMTP_USERNAME or not SMTP_PASSWORD:
-        raise HTTPException(status_code=500, detail="Gmail credentials (email/app password) not configured in .env")
-
     try:
-        # Create the email message
-        msg = MIMEMultipart()
-        msg['From'] = SMTP_USERNAME
-        msg['To'] = request.recipient_email
-        msg['Subject'] = request.subject
-        msg['Date'] = time.strftime("%a, %d %b %Y %H:%M:%S %z")
-        msg.attach(MIMEText(request.body, 'plain'))
+        token_data = base64.b64decode(request.auth_token).decode()
+        creds_info = json.loads(token_data)
+        creds = Credentials.from_authorized_user_info(creds_info, SCOPES)
         
-        raw_message = msg.as_bytes()
+        if creds.expired and creds.refresh_token:
+            creds.refresh(GoogleRequest())
 
-        # Connect to Gmail IMAP
-        imap = imaplib.IMAP4_SSL(IMAP_SERVER)
-        imap.login(SMTP_USERNAME, SMTP_PASSWORD)
+        service = build('gmail', 'v1', credentials=creds)
         
-        # Select Drafts folder (Gmail standard is "[Gmail]/Drafts")
-        imap.append("[Gmail]/Drafts", "", imaplib.Time2Internaldate(time.time()), raw_message)
-        imap.logout()
+        message = MIMEMultipart()
+        message['to'] = request.recipient_email
+        message['subject'] = request.subject
+        message.attach(MIMEText(request.body, 'plain'))
         
-        return {"status": "success", "message": "Draft created in Gmail successfully!"}
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        draft = {
+            'message': {
+                'raw': raw_message
+            }
+        }
+        
+        service.users().drafts().create(userId="me", body=draft).execute()
+        return {"status": "success", "message": "Draft created in your Gmail account!"}
     except Exception as e:
         print(f"Error creating draft: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to create draft: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
