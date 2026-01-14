@@ -9,6 +9,9 @@ interface Draft {
   body: string;
 }
 
+// Configuration - Set your secret token here to match the backend ADMIN_TOKEN
+const ADMIN_TOKEN = "default_secret_token_123";
+
 export default function MailAiApp() {
   const [formData, setFormData] = useState({
     sender_name: "",
@@ -21,39 +24,7 @@ export default function MailAiApp() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [authToken, setAuthToken] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
-
-  useEffect(() => {
-    // Check for token in URL after OAuth redirect
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-    if (token) {
-      setAuthToken(token);
-      window.history.replaceState({}, document.title, window.location.pathname);
-      showNotification("success", "Gmail connected successfully!");
-    }
-  }, []);
-
-  const connectGmail = async () => {
-    console.log("Connect Gmail clicked...");
-    try {
-      const response = await fetch("https://mail-it-ai.onrender.com/auth-url");
-      console.log("Response status:", response.status);
-      const data = await response.json();
-      console.log("Auth URL data:", data);
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        console.error("No URL returned from backend:", data);
-        alert("Server did not return an auth URL. Check backend logs.");
-      }
-    } catch (error) {
-      console.error("Connection error:", error);
-      showNotification("error", "Failed to start Gmail connection.");
-      alert("Error: " + (error instanceof Error ? error.message : "Network error"));
-    }
-  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -76,6 +47,7 @@ export default function MailAiApp() {
           recipient_name: formData.recipient_name,
           purpose: formData.purpose,
           tone: formData.tone,
+          admin_token: ADMIN_TOKEN,
         }),
       });
 
@@ -103,11 +75,6 @@ export default function MailAiApp() {
       return;
     }
 
-    if (!authToken) {
-      showNotification("error", "Please connect your Gmail first.");
-      return;
-    }
-
     setIsSending(true);
     try {
       const response = await fetch("https://mail-it-ai.onrender.com/send-email", {
@@ -117,7 +84,7 @@ export default function MailAiApp() {
           recipient_email: formData.recipient_email,
           subject: draft.subject,
           body: draft.body,
-          auth_token: authToken,
+          admin_token: ADMIN_TOKEN,
         }),
       });
 
@@ -126,48 +93,11 @@ export default function MailAiApp() {
         throw new Error(err.detail || "Failed to send email");
       }
 
-      showNotification("success", "Email sent successfully!");
+      showNotification("success", "Email sent successfully via private SMTP!");
       setDraft(null);
       setFormData({ ...formData, recipient_email: "", purpose: "" });
     } catch (error: any) {
       showNotification("error", error.message || "Error sending email.");
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const saveToDrafts = async () => {
-    if (!draft || !formData.recipient_email) {
-      showNotification("error", "Recipient email and draft are required.");
-      return;
-    }
-
-    if (!authToken) {
-      showNotification("error", "Please connect your Gmail first.");
-      return;
-    }
-
-    setIsSending(true);
-    try {
-      const response = await fetch("https://mail-it-ai.onrender.com/create-draft-gmail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipient_email: formData.recipient_email,
-          subject: draft.subject,
-          body: draft.body,
-          auth_token: authToken,
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || "Failed to create draft");
-      }
-
-      showNotification("success", "Draft saved to your Gmail successfully!");
-    } catch (error: any) {
-      showNotification("error", error.message || "Error saving draft.");
     } finally {
       setIsSending(false);
     }
@@ -194,25 +124,15 @@ export default function MailAiApp() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
-          {!authToken ? (
-            <button
-              onClick={connectGmail}
-              className="mb-8 inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-700 font-bold rounded-full shadow-md border border-gray-100 hover:bg-gray-50 hover:shadow-lg transition-all"
-            >
-              <LogIn className="w-5 h-5 text-google-red" style={{ color: '#DB4437' }} />
-              Connect your Gmail account
-            </button>
-          ) : (
-            <div className="mb-8 inline-flex items-center gap-2 px-6 py-2 bg-emerald-50 text-emerald-700 font-medium rounded-full border border-emerald-100">
-              <CheckCircle className="w-4 h-4" />
-              Gmail Connected
-            </div>
-          )}
+          <div className="inline-flex items-center gap-2 px-6 py-2 bg-indigo-50 text-indigo-700 font-medium rounded-full border border-indigo-100 mb-8">
+            <User className="w-4 h-4" />
+            Private Professional Tool
+          </div>
           <h1 className="text-4xl font-extrabold text-gray-900 sm:text-5xl tracking-tight mb-4">
             Mailit <span className="text-primary italic">AI</span>
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            The professional AI email assistant. Prompt, preview, and send in seconds.
+            Your private AI email assistant. Prompt, preview, and send.
           </p>
         </div>
 
@@ -399,14 +319,6 @@ export default function MailAiApp() {
                         </>
                       )}
                     </button>
-                    <button
-                      onClick={saveToDrafts}
-                      disabled={isSending || !formData.recipient_email}
-                      className="btn-secondary flex-1 py-4 !bg-indigo-50 !text-indigo-700 hover:!bg-indigo-100 border border-indigo-200"
-                    >
-                      <ArchiveRestore className="w-4 h-4" />
-                      Save to Gmail Drafts
-                    </button>
                   </div>
                   <button
                     onClick={() => setDraft(null)}
@@ -425,11 +337,7 @@ export default function MailAiApp() {
 
       {/* Footer */}
       <footer className="mt-20 text-center text-gray-400 text-sm space-y-4">
-        <div className="flex justify-center gap-6">
-          <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
-          <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
-        </div>
-        <p>© 2026 Mailit AI. Developed with ❤️ for professional communication.</p>
+        <p>© 2026 Mailit AI. Your private professional assistant.</p>
       </footer>
     </div>
   );

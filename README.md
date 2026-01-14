@@ -5,10 +5,10 @@ A professional AI-powered email drafting and sending assistant.
 ## Features
 - AI-driven draft generation (using Groq Llama 3.1)
 - Custom Editing: Fine-tune drafts before sending
-- One-click Gmail Drafts: Save directly to your Gmail account
+- Private SMTP Integration: Send emails directly via your own server (no public login)
 - Modern, professional UI with glassmorphism
 - Real-time preview of drafted emails
-- Secure SMTP integration for sending
+- Admin-only access with security token
 
 ## Setup
 

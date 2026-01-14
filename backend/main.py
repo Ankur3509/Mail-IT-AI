@@ -10,32 +10,23 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from groq import Groq
 
-# Google Auth imports
-from google_auth_oauthlib.flow import Flow
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from google.auth.transport.requests import Request as GoogleRequest
-
 load_dotenv()
 
 # Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://mail-it-ai.onrender.com/oauth2callback")
 
-# Scopes for Gmail
-SCOPES = [
-    'https://www.googleapis.com/auth/gmail.send',
-    'https://www.googleapis.com/auth/gmail.compose',
-    'https://www.googleapis.com/auth/userinfo.email',
-    'openid'
-]
+# SMTP Configuration
+SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME = os.getenv("SMTP_USERNAME")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+SENDER_NAME = os.getenv("SENDER_NAME", "Mailit AI")
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "default_secret_token_123") # Simple protection
 
 # Initialize Groq
 client = Groq(api_key=GROQ_API_KEY)
 
-app = FastAPI(title="Mailit AI API")
+app = FastAPI(title="Mailit AI Private API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,6 +41,7 @@ class DraftRequest(BaseModel):
     recipient_name: str
     purpose: str
     tone: str
+    admin_token: str
 
 class EmailDraft(BaseModel):
     subject: str
@@ -59,10 +51,13 @@ class SendRequest(BaseModel):
     recipient_email: str
     subject: str
     body: str
-    auth_token: str # Token from OAuth
+    admin_token: str # Simple token for private use
 
 @app.post("/generate-draft", response_model=EmailDraft)
 async def generate_draft(request: DraftRequest):
+    # Security check
+    if request.admin_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized")
     prompt = f"""
     You are a senior executive assistant. 
     Draft a stunningly professional email from {request.sender_name} to {request.recipient_name}.
@@ -101,123 +96,41 @@ async def generate_draft(request: DraftRequest):
                 text = text[4:]
         
         draft_data = json.loads(text)
-        if isinstance(draft_data, list) and len(draft_data) > 0:
-            draft_data = draft_data[0]
-            
         return EmailDraft(**draft_data)
     except Exception as e:
         print(f"Error generating draft: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate draft: {str(e)}")
 
-# --- OAuth2 Endpoints ---
-
-@app.get("/auth-url")
-async def get_auth_url():
-    if not CLIENT_ID or not CLIENT_SECRET:
-        raise HTTPException(status_code=500, detail="Google Client credentials not configured")
-        
-    client_config = {
-        "web": {
-            "client_id": CLIENT_ID,
-            "project_id": "mail-it-ai",
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_secret": CLIENT_SECRET,
-            "redirect_uris": [REDIRECT_URI]
-        }
-    }
-    
-    flow = Flow.from_client_config(client_config, scopes=SCOPES)
-    flow.redirect_uri = REDIRECT_URI
-    
-    auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
-    return {"url": auth_url}
-
-@app.get("/oauth2callback")
-async def oauth2callback(code: str):
-    client_config = {
-        "web": {
-            "client_id": CLIENT_ID,
-            "project_id": "mail-it-ai",
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_secret": CLIENT_SECRET,
-            "redirect_uris": [REDIRECT_URI]
-        }
-    }
-    
-    flow = Flow.from_client_config(client_config, scopes=SCOPES)
-    flow.redirect_uri = REDIRECT_URI
-    flow.fetch_token(code=code)
-    
-    creds = flow.credentials
-    # In a real app, we'd store this in a DB. 
-    # For now, we'll redirect back to frontend with the token in the URL (simplified)
-    frontend_url = os.getenv("FRONTEND_URL", "https://mailitai.netlify.app")
-    token_json = creds.to_json()
-    encoded_token = base64.b64encode(token_json.encode()).decode()
-    
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(f"{frontend_url}/?token={encoded_token}")
-
 @app.post("/send-email")
 async def send_email(request: SendRequest):
-    try:
-        # Reconstruct credentials
-        token_data = base64.b64decode(request.auth_token).decode()
-        creds_info = json.loads(token_data)
-        creds = Credentials.from_authorized_user_info(creds_info, SCOPES)
-        
-        if creds.expired and creds.refresh_token:
-            creds.refresh(GoogleRequest())
+    # Security check: Simple token
+    if request.admin_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Unauthorized: Access restricted to the owner.")
 
-        service = build('gmail', 'v1', credentials=creds)
-        
+    if not SMTP_USERNAME or not SMTP_PASSWORD:
+        raise HTTPException(status_code=500, detail="SMTP credentials not configured.")
+
+    try:
         message = MIMEMultipart()
-        message['to'] = request.recipient_email
-        message['subject'] = request.subject
+        message['From'] = f"{SENDER_NAME} <{SMTP_USERNAME}>"
+        message['To'] = request.recipient_email
+        message['Subject'] = request.subject
         message.attach(MIMEText(request.body, 'plain'))
         
-        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-        create_message = {'raw': raw_message}
+        # SMTP Sending
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        server.send_message(message)
+        server.quit()
         
-        service.users().messages().send(userId="me", body=create_message).execute()
-        return {"status": "success", "message": "Email sent successfully via your Gmail!"}
+        return {"status": "success", "message": "Email sent successfully via your private SMTP server!"}
     except Exception as e:
         print(f"Error sending email: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/create-draft-gmail")
-async def create_draft_gmail(request: SendRequest):
-    try:
-        token_data = base64.b64decode(request.auth_token).decode()
-        creds_info = json.loads(token_data)
-        creds = Credentials.from_authorized_user_info(creds_info, SCOPES)
-        
-        if creds.expired and creds.refresh_token:
-            creds.refresh(GoogleRequest())
+# Note: create-draft-gmail is removed as it requires Gmail API / OAuth which we are disabling for public-less use.
 
-        service = build('gmail', 'v1', credentials=creds)
-        
-        message = MIMEMultipart()
-        message['to'] = request.recipient_email
-        message['subject'] = request.subject
-        message.attach(MIMEText(request.body, 'plain'))
-        
-        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-        draft = {
-            'message': {
-                'raw': raw_message
-            }
-        }
-        
-        service.users().drafts().create(userId="me", body=draft).execute()
-        return {"status": "success", "message": "Draft created in your Gmail account!"}
-    except Exception as e:
-        print(f"Error creating draft: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
